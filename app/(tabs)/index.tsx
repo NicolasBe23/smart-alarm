@@ -1,98 +1,127 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useAlarm } from "@/contexts/AlarmContext";
+import { alarmStyles, colors, globalStyles, spacing } from "@/styles";
+import { router } from "expo-router";
+import React from "react";
+import {
+  Alert,
+  FlatList,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const { state, toggleAlarm, deleteAlarm } = useAlarm();
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const formatTime = (time: string) => {
+    const [hours, minutes] = time.split(":");
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+  const getDaysText = (days: number[]) => {
+    if (days.length === 7) return "Todos os dias";
+    if (days.length === 0) return "Nunca";
+
+    const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    return days.map((day) => dayNames[day]).join(", ");
+  };
+
+  const handleDeleteAlarm = (id: string, label: string) => {
+    Alert.alert("Excluir Alarme", `Deseja excluir o alarme "${label}"?`, [
+      { text: "Cancelar", style: "cancel" },
+      { text: "Excluir", style: "destructive", onPress: () => deleteAlarm(id) },
+    ]);
+  };
+
+  const renderAlarm = ({ item }: { item: any }) => (
+    <View style={alarmStyles.alarmCard}>
+      <View style={alarmStyles.alarmContent}>
+        <View style={alarmStyles.alarmInfo}>
+          <Text style={alarmStyles.timeText}>{formatTime(item.time)}</Text>
+          <Text style={alarmStyles.labelText}>{item.label}</Text>
+          <Text style={alarmStyles.daysText}>{getDaysText(item.days)}</Text>
+          {item.photoChallenge && (
+            <View style={alarmStyles.photoChallengeRow}>
+              <IconSymbol name="camera.fill" size={16} color={colors.gray500} />
+              <Text style={alarmStyles.photoChallengeText}>
+                Desafio da foto
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={alarmStyles.controlsRow}>
+          <Switch
+            value={item.isActive}
+            onValueChange={() => toggleAlarm(item.id)}
+            trackColor={{ false: colors.gray200, true: colors.primary }}
+            thumbColor={item.isActive ? colors.white : colors.gray400}
+          />
+
+          <TouchableOpacity
+            onPress={() => router.push(`/edit-alarm?id=${item.id}`)}
+            style={alarmStyles.iconButton}
+          >
+            <IconSymbol name="pencil" size={20} color={colors.gray500} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => handleDeleteAlarm(item.id, item.label)}
+            style={alarmStyles.iconButton}
+          >
+            <IconSymbol name="trash" size={20} color={colors.red500} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={globalStyles.container}>
+      <View style={globalStyles.content}>
+        <View style={globalStyles.header}>
+          <Text style={globalStyles.title}>Smart Alarm</Text>
+          <TouchableOpacity
+            onPress={() => router.push("/add-alarm")}
+            style={alarmStyles.addButton}
+          >
+            <IconSymbol name="plus" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
+
+        {state.alarms.length === 0 ? (
+          <View style={globalStyles.emptyState}>
+            <IconSymbol name="alarm" size={80} color={colors.gray400} />
+            <Text style={globalStyles.emptyTitle}>
+              Nenhum alarme configurado
+            </Text>
+            <Text style={globalStyles.emptySubtitle}>
+              Toque no + para adicionar seu primeiro alarme
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={state.alarms}
+            renderItem={renderAlarm}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContainer}
+          />
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  listContainer: {
+    paddingBottom: spacing.xl,
   },
 });
